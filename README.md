@@ -6,6 +6,10 @@ This project is a DNS Security Monitoring System designed to monitor DNS request
 
 The system analyzes domain names using security-based features and classifies them as **SAFE** or **MALICIOUS**. When a suspicious domain is detected, the system generates a security alert.
 
+## Problem Statement
+
+Traditional DNS security systems mainly rely on known malicious-domain blacklists, which may fail to detect newly created, fast-changing, or previously unseen malicious domains. Therefore, there is a need for a DNS security monitoring system that can analyze DNS query behavior and domain characteristics in real time to identify suspicious domains even when they are not present in existing threat-intelligence databases.
+
 ## Features
 
 - DNS request monitoring
