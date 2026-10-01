@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | DNS Security Monitor{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+
+    <!-- Top Action Bar & Simulator Controls -->
+    <div class="control-panel">
+        <div class="control-info">
+            <h2>Live DNS Traffic Monitor</h2>
+            <p>Monitors network DNS queries and applies real-time threat intelligence heuristics.</p>
+        </div>
+        <div class="control-actions">
+            <button id="btn-start" class="btn btn-start" onclick="startSimulator()">
+                <span class="btn-icon">▶</span> Start Monitoring
+            </button>
+            <button id="btn-stop" class="btn btn-stop" onclick="stopSimulator()">
+                <span class="btn-icon">⏹</span> Stop Monitoring
+            </button>
+            <div class="live-pill">
+                <span class="live-indicator"></span>
+                <span id="simulator-mode-label">Mode: Mock DNS Stream</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metric KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card card-total">
+            <div class="kpi-header">
+                <span class="kpi-title">Total DNS Requests</span>
+                <span class="kpi-icon">🌐</span>
+            </div>
+            <div class="kpi-value" id="kpi-total">{{ stats.total_requests }}</div>
+            <div class="kpi-footer">Captured DNS Queries</div>
+        </div>
+
+        <div class="kpi-card card-safe">
+            <div class="kpi-header">
+                <span class="kpi-title">Safe Domains</span>
+                <span class="kpi-icon">🛡️</span>
+            </div>
+            <div class="kpi-value" id="kpi-safe">{{ stats.safe_requests }}</div>
+            <div class="kpi-footer">Normal & Benign Traffic</div>
+        </div>
+
+        <div class="kpi-card card-malicious">
+            <div class="kpi-header">
+                <span class="kpi-title">Malicious Domains</span>
+                <span class="kpi-icon">⚠️</span>
+            </div>
+            <div class="kpi-value" id="kpi-malicious">{{ stats.malicious_requests }}</div>
+            <div class="kpi-footer">Phishing, DGA & High Entropy</div>
+        </div>
+
+        <div class="kpi-card card-alerts">
+            <div class="kpi-header">
+                <span class="kpi-title">Security Alerts</span>
+                <span class="kpi-icon">🚨</span>
+            </div>
+            <div class="kpi-value" id="kpi-alerts">{{ stats.total_alerts }}</div>
+            <div class="kpi-footer">Actionable Incident Triggers</div>
+        </div>
+    </div>
+
+    <!-- Analytics & Alerts Row -->
+    <div class="analytics-row">
+        <!-- Visual Distribution Chart -->
+        <div class="chart-card">
+            <div class="card-title-bar">
+                <h3>Traffic Threat Ratio</h3>
+                <span class="badge badge-info">Real-time</span>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="threatRatioChart"></canvas>
+            </div>
+            <div class="chart-legend-custom">
+                <div class="legend-item"><span class="legend-dot safe-dot"></span> Safe Traffic</div>
+                <div class="legend-item"><span class="legend-dot malicious-dot"></span> Malicious / Suspicious</div>
+            </div>
+        </div>
+
+        <!-- Recent Security Alerts Section -->
+        <div class="alerts-card">
+            <div class="card-title-bar">
+                <h3>Recent Security Alerts</h3>
+                <span class="badge badge-alert" id="alerts-count-badge">{{ recent_alerts|length }} Active</span>
+            </div>
+            <div class="alerts-list" id="alerts-list-container">
+                {% if recent_alerts %}
+                    {% for alert in recent_alerts %}
+                        <div class="alert-item alert-{{ alert.severity|lower }}">
+                            <div class="alert-header">
+                                <span class="badge badge-severity badge-{{ alert.severity|lower }}">{{ alert.severity }}</span>
+                                <span class="alert-type">{{ alert.threat_type }}</span>
+                                <span class="alert-time">{{ alert.created_at[11:19] }}</span>
+                            </div>
+                            <div class="alert-domain"><strong>Domain:</strong> <code>{{ alert.domain }}</code></div>
+                            <div class="alert-meta">
+                                <span><strong>Host:</strong> {{ alert.client_ip }}</span>
+                                <span><strong>Confidence:</strong> {{ (alert.confidence_score * 100)|int }}%</span>
+                            </div>
+                            {% if alert.details %}
+                                <div class="alert-details">{{ alert.details }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">No security alerts detected yet. Start monitoring to begin traffic analysis.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent DNS Requests Table -->
+    <div class="table-card">
+        <div class="card-title-bar">
+            <h3>Recent DNS Activity Log</h3>
+            <span class="table-counter" id="table-counter">Showing latest 15 queries</span>
+        </div>
+        <div class="table-responsive">
+            <table class="soc-table">
+                <thead>
+                    <tr>
+                        <th>Domain</th>
+                        <th>Client IP</th>
+                        <th>Query Type</th>
+                        <th>Source</th>
+                        <th>Classification</th>
+                        <th>Timestamp (UTC)</th>
+                    </tr>
+                </thead>
+                <tbody id="dns-requests-tbody">
+                    {% if recent_requests %}
+                        {% for req in recent_requests %}
+                            <tr>
+                                <td><code class="domain-text">{{ req.query_domain }}</code></td>
+                                <td>{{ req.client_ip }}</td>
+                                <td><span class="badge badge-type">{{ req.query_type }}</span></td>
+                                <td><span class="badge badge-source">{{ req.source_mode }}</span></td>
+                                <td>
+                                    {% if req.is_malicious == 1 %}
+                                        <span class="badge badge-malicious">MALICIOUS</span>
+                                    {% else %}
+                                        <span class="badge badge-safe">SAFE</span>
+                                    {% endif %}
+                                </td>
+                                <td class="timestamp-col">{{ req.timestamp[11:19] }} ({{ req.timestamp[:10] }})</td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="empty-state">No DNS requests recorded yet. Click 'Start Monitoring' above to simulate queries.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let threatChart = null;
+
+    // Initialize Chart.js Donut
+    function initChart(safeCount, maliciousCount) {
+        const ctx = document.getElementById('threatRatioChart').getContext('2d');
+        const total = safeCount + maliciousCount;
+        const safeData = total === 0 ? 1 : safeCount;
+        const maliciousData = total === 0 ? 0 : maliciousCount;
+
+        threatChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Safe', 'Malicious'],
+                datasets: [{
+                    data: [safeData, maliciousData],
+                    backgroundColor: ['#2ea043', '#da3633'],
+                    borderColor: '#111827',
+                    borderWidth: 3,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return ` ${context.label}: ${context.raw}`;
+                            }
+                        }
+                    }
+                },
+                cutout: '70%'
+            }
+        });
+    }
+
+    // Start Simulator Handler
+    async function startSimulator() {
+        try {
+            const btn = document.getElementById('btn-start');
+            btn.disabled = true;
+            const res = await fetch('/api/simulator/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ interval: 1.0 })
+            });
+            const data = await res.json();
+            btn.disabled = false;
+            updateStatusUI(data.running);
+        } catch (e) {
+            console.error('Error starting simulator:', e);
+        }
+    }
+
+    // Stop Simulator Handler
+    async function stopSimulator() {
+        try {
+            const btn = document.getElementById('btn-stop');
+            btn.disabled = true;
+            const res = await fetch('/api/simulator/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            btn.disabled = false;
+            updateStatusUI(data.running);
+        } catch (e) {
+            console.error('Error stopping simulator:', e);
+        }
+    }
+
+    function updateStatusUI(isRunning) {
+        const dot = document.getElementById('global-status-dot');
+        const txt = document.getElementById('global-status-text');
+        if (isRunning) {
+            dot.className = 'status-dot status-running';
+            txt.innerText = 'MONITORING ACTIVE';
+        } else {
+            dot.className = 'status-dot status-stopped';
+            txt.innerText = 'SIMULATOR IDLE';
+        }
+    }
+
+    // Periodic Polling to update dashboard stats, charts, requests, and alerts
+    async function pollDashboardData() {
+        try {
+            // 1. Fetch Stats
+            const statsRes = await fetch('/api/stats');
+            const stats = await statsRes.json();
+
+            document.getElementById('kpi-total').innerText = stats.total_requests;
+            document.getElementById('kpi-safe').innerText = stats.safe_requests;
+            document.getElementById('kpi-malicious').innerText = stats.malicious_requests;
+            document.getElementById('kpi-alerts').innerText = stats.total_alerts;
+            updateStatusUI(stats.simulator_running);
+
+            // Update chart
+            if (threatChart) {
+                threatChart.data.datasets[0].data = [stats.safe_requests, stats.malicious_requests];
+                threatChart.update('none');
+            }
+
+            // 2. Fetch Recent Requests
+            const reqRes = await fetch('/api/recent-requests?limit=15');
+            const requests = await reqRes.json();
+            const tbody = document.getElementById('dns-requests-tbody');
+
+            if (requests && requests.length > 0) {
+                tbody.innerHTML = requests.map(r => {
+                    const badgeClass = r.is_malicious === 1 ? 'badge-malicious' : 'badge-safe';
+                    const badgeText = r.is_malicious === 1 ? 'MALICIOUS' : 'SAFE';
+                    const timeStr = r.timestamp.length >= 19 ? r.timestamp.substring(11, 19) : r.timestamp;
+                    const dateStr = r.timestamp.length >= 10 ? r.timestamp.substring(0, 10) : '';
+                    return `
+                        <tr>
+                            <td><code class="domain-text">${escapeHtml(r.query_domain)}</code></td>
+                            <td>${escapeHtml(r.client_ip)}</td>
+                            <td><span class="badge badge-type">${escapeHtml(r.query_type)}</span></td>
+                            <td><span class="badge badge-source">${escapeHtml(r.source_mode)}</span></td>
+                            <td><span class="badge ${badgeClass}">${badgeText}</span></td>
+                            <td class="timestamp-col">${timeStr} (${dateStr})</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // 3. Fetch Recent Alerts
+            const alertRes = await fetch('/api/recent-alerts?limit=6');
+            const alerts = await alertRes.json();
+            const alertsContainer = document.getElementById('alerts-list-container');
+            const alertsBadge = document.getElementById('alerts-count-badge');
+            alertsBadge.innerText = `${alerts.length} Active`;
+
+            if (alerts && alerts.length > 0) {
+                alertsContainer.innerHTML = alerts.map(a => {
+                    const timeStr = a.created_at.length >= 19 ? a.created_at.substring(11, 19) : a.created_at;
+                    const sev = a.severity.toLowerCase();
+                    const conf = Math.round(a.confidence_score * 100);
+                    const details = a.details ? `<div class="alert-details">${escapeHtml(a.details)}</div>` : '';
+                    return `
+                        <div class="alert-item alert-${sev}">
+                            <div class="alert-header">
+                                <span class="badge badge-severity badge-${sev}">${escapeHtml(a.severity)}</span>
+                                <span class="alert-type">${escapeHtml(a.threat_type)}</span>
+                                <span class="alert-time">${timeStr}</span>
+                            </div>
+                            <div class="alert-domain"><strong>Domain:</strong> <code>${escapeHtml(a.domain)}</code></div>
+                            <div class="alert-meta">
+                                <span><strong>Host:</strong> ${escapeHtml(a.client_ip)}</span>
+                                <span><strong>Confidence:</strong> ${conf}%</span>
+                            </div>
+                            ${details}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+        } catch (e) {
+            console.error('Polling error:', e);
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, function(m) {
+            return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[m];
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initChart({{ stats.safe_requests }}, {{ stats.malicious_requests }});
+        // Poll every 2.0 seconds for smooth live streaming
+        setInterval(pollDashboardData, 2000);
+    });
+</script>
+{% endblock %}

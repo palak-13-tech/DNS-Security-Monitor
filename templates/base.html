@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DNS Security Monitor{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <header class="soc-header">
+        <div class="header-container">
+            <div class="brand">
+                <div class="radar-icon">
+                    <span class="pulse"></span>
+                </div>
+                <div>
+                    <h1 class="brand-title">DNS Security Monitor</h1>
+                    <span class="brand-sub">SOC Threat Detection & Domain Analytics Lab</span>
+                </div>
+            </div>
+
+            <nav class="nav-links">
+                <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
+                    Operations Dashboard
+                </a>
+                <a href="{{ url_for('analyzer') }}" class="nav-item {% if request.endpoint == 'analyzer' %}active{% endif %}">
+                    Domain Analyzer
+                </a>
+            </nav>
+
+            <div class="system-status">
+                <span id="global-status-dot" class="status-dot {% if is_running %}status-running{% else %}status-stopped{% endif %}"></span>
+                <span id="global-status-text" class="status-text">
+                    {% if is_running %}MONITORING ACTIVE{% else %}SIMULATOR IDLE{% endif %}
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="soc-footer">
+        <div class="footer-container">
+            <span>DNS Security Monitoring & Malicious Domain Detection System</span>
+            <span class="prototype-badge">College Project Demonstration Prototype</span>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

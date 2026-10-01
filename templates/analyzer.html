@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Domain Analyzer | DNS Security Monitor{% endblock %}
+
+{% block content %}
+<div class="analyzer-container">
+
+    <div class="page-title-box">
+        <h2>Manual Domain Security Analyzer</h2>
+        <p class="subtitle">Extract lexical, linguistic, and structural attributes to evaluate domain risk in real time.</p>
+        <div class="engine-notice">
+            <span class="notice-icon">ℹ️</span>
+            <span><strong>Detection Engine:</strong> Prototype Rule-Based Heuristics (Pre-ML Baseline). Evaluates character distributions, phishing lure keywords, entropy, and structural anomalies.</span>
+        </div>
+    </div>
+
+    <!-- Domain Input Form -->
+    <div class="analyzer-card input-card">
+        <form method="POST" action="{{ url_for('analyzer') }}" class="analyzer-form">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="domain-input" 
+                    name="domain" 
+                    placeholder="Enter domain name to inspect (e.g., paypal-security-update.xyz or google.com)" 
+                    value="{{ domain_input }}" 
+                    required 
+                    autocomplete="off"
+                />
+                <button type="submit" class="btn btn-primary">
+                    <span>🔍</span> Analyze Domain
+                </button>
+            </div>
+        </form>
+
+        <!-- Quick Demo Shortcuts -->
+        <div class="quick-examples">
+            <span class="quick-label">Try Demo Presets:</span>
+            <button type="button" class="btn-chip chip-safe" onclick="setDomain('google.com')">google.com (Benign)</button>
+            <button type="button" class="btn-chip chip-phish" onclick="setDomain('paypal-security-update.xyz')">paypal-security-update.xyz (Phishing)</button>
+            <button type="button" class="btn-chip chip-entropy" onclick="setDomain('k8x92m0qvwz14.info')">k8x92m0qvwz14.info (High Entropy)</button>
+            <button type="button" class="btn-chip chip-dga" onclick="setDomain('bcdfghjklmnpqrst.net')">bcdfghjklmnpqrst.net (DGA)</button>
+        </div>
+    </div>
+
+    <!-- Analysis Results Section -->
+    {% if analysis %}
+    <div class="results-container">
+
+        <!-- Verdict Header Card -->
+        <div class="verdict-card {% if analysis.prediction == 'MALICIOUS' %}verdict-malicious{% else %}verdict-safe{% endif %}">
+            <div class="verdict-summary">
+                <div class="verdict-badge-row">
+                    <span class="verdict-label">DETECTION RESULT:</span>
+                    <span class="badge {% if analysis.prediction == 'MALICIOUS' %}badge-malicious badge-large{% else %}badge-safe badge-large{% endif %}">
+                        {{ analysis.prediction }}
+                    </span>
+                    <span class="badge badge-severity badge-{{ analysis.severity|lower }}">
+                        Severity: {{ analysis.severity }}
+                    </span>
+                    <span class="confidence-pill">Confidence: {{ (analysis.confidence_score * 100)|int }}%</span>
+                </div>
+                <div class="inspected-domain">
+                    <span>Target Domain:</span>
+                    <code>{{ analysis.domain }}</code>
+                </div>
+            </div>
+            <div class="verdict-threat">
+                <span class="threat-label">Threat Classification:</span>
+                <span class="threat-val">{{ analysis.primary_threat_type }}</span>
+            </div>
+        </div>
+
+        <!-- 6 Key Required Features Grid -->
+        <div class="features-section">
+            <h3 class="section-title">Extracted Domain Characteristics</h3>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <span class="feat-name">Domain Length</span>
+                    <span class="feat-value">{{ analysis.domain_length }} <span class="feat-unit">chars</span></span>
+                    <span class="feat-hint">Total string length</span>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feat-name">Digit Count</span>
+                    <span class="feat-value {% if analysis.digit_count >= 4 %}feat-warning{% endif %}">
+                        {{ analysis.digit_count }}
+                    </span>
+                    <span class="feat-hint">Numeric digits present</span>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feat-name">Special Characters</span>
+                    <span class="feat-value {% if analysis.special_char_count >= 2 %}feat-warning{% endif %}">
+                        {{ analysis.special_char_count }}
+                    </span>
+                    <span class="feat-hint">Hyphens & symbols (excl. dots)</span>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feat-name">Subdomain Count</span>
+                    <span class="feat-value {% if analysis.subdomain_count >= 3 %}feat-warning{% endif %}">
+                        {{ analysis.subdomain_count }}
+                    </span>
+                    <span class="feat-hint">Subdomain label hierarchy</span>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feat-name">Suspicious Keywords</span>
+                    <span class="feat-value {% if analysis.suspicious_keyword_count > 0 %}feat-alert{% endif %}">
+                        {{ analysis.suspicious_keyword_count }}
+                    </span>
+                    <span class="feat-hint">
+                        {% if analysis.matched_keywords %}
+                            Matched: {{ analysis.matched_keywords|join(', ') }}
+                        {% else %}
+                            No phishing lures matched
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feat-name">Shannon Entropy</span>
+                    <span class="feat-value {% if analysis.entropy >= 3.65 %}feat-alert{% endif %}">
+                        {{ analysis.entropy }}
+                    </span>
+                    <span class="feat-hint">Character distribution randomness</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detection Reasoning Box -->
+        <div class="reasoning-card">
+            <div class="card-title-bar">
+                <h3>Reason for Detection</h3>
+                <span class="badge badge-info">Explainable Reasoning</span>
+            </div>
+            <ul class="reason-list">
+                {% for reason in analysis.reasons %}
+                    <li class="reason-item">
+                        <span class="reason-bullet">›</span>
+                        <span>{{ reason }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function setDomain(domain) {
+        const input = document.getElementById('domain-input');
+        input.value = domain;
+        input.form.submit();
+    }
+</script>
+{% endblock %}
